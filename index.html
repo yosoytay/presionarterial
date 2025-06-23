@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="es-AR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Registro de Presión Arterial y Pulso</title>
+    <!-- Incluye Tailwind CSS para estilos modernos y responsivos -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Incluye Chart.js para gráficos -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
+    <style>
+        /* Estilos base sin cambios significativos, se añaden estilos para nuevos elementos */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f2f5;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            min-height: 100vh;
+            padding: 20px;
+            box-sizing: border-box;
+            color: #374151;
+        }
+
+        .container {
+            background-color: #ffffff;
+            border-radius: 16px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.08);
+            padding: 40px;
+            width: 100%;
+            max-width: 900px;
+            text-align: center;
+            border: 1px solid #e2e8f0;
+        }
+
+        h1, h2 {
+            color: #1a202c;
+            position: relative;
+            padding-bottom: 10px;
+        }
+
+        h1 {
+            margin-bottom: 30px;
+            font-size: 2.5rem;
+            font-weight: 700;
+        }
+        
+        h2 {
+            font-size: 1.8rem;
+            font-weight: 600;
+            margin-top: 40px;
+            margin-bottom: 20px;
+        }
+
+        h1::after, h2::after {
+            content: '';
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            bottom: 0;
+            width: 80px;
+            height: 4px;
+            background-color: #3b82f6;
+            border-radius: 2px;
+        }
+        h2::after { width: 60px; background-color: #60a5fa; }
+
+
+        /* Formulario de entrada */
+        .entry-form {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+            text-align: left;
+        }
+        .form-group { display: flex; flex-direction: column; }
+        .form-group label { margin-bottom: 8px; font-weight: 600; color: #4b5563; }
+        .form-group input {
+            padding: 10px 15px;
+            border-radius: 8px;
+            border: 1px solid #d1d5db;
+            background-color: #f9fafb;
+            font-size: 1rem;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        .form-group input:focus {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+            outline: none;
+        }
+        .form-button {
+            background-color: #3b82f6;
+            color: white;
+            padding: 12px;
+            border-radius: 8px;
+            border: none;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            grid-column: 1 / -1; /* Ocupa todo el ancho */
+        }
+        .form-button:hover { background-color: #2563eb; }
+
+        /* Estilos de la tabla, con mejoras para el botón de eliminar y color de borde */
+        table { width: 100%; border-collapse: separate; border-spacing: 0; margin-top: 20px; border-radius: 12px; box-shadow: 0 10px 20px rgba(0, 0, 0, 0.05); overflow: hidden; }
+        th, td { padding: 18px 15px; text-align: center; border-bottom: 1px solid #e5e7eb; }
+        th { background-color: #3b82f6; color: white; font-weight: 600; text-transform: uppercase; font-size: 0.9rem; letter-spacing: 0.05em; }
+        tr:nth-child(even) { background-color: #f9fafb; }
+        tr:hover { background-color: #e0f2fe; }
+        td { font-size: 1rem; color: #4b5563; }
+        .value-cell { font-weight: 500; color: #1f2937; }
+        tr { border-left: 5px solid transparent; transition: border-left-color 0.3s; }
+        .delete-btn { background: #fee2e2; color: #ef4444; border: none; border-radius: 50%; width: 30px; height: 30px; cursor: pointer; transition: background-color 0.2s, color 0.2s; font-weight: bold; }
+        .delete-btn:hover { background: #ef4444; color: white; }
+        
+        /* Leyenda de colores */
+        .legend { display: flex; justify-content: center; flex-wrap: wrap; gap: 20px; margin-top: 20px; }
+        .legend-item { display: flex; align-items: center; gap: 8px; }
+        .legend-color { width: 15px; height: 15px; border-radius: 50%; }
+
+        /* Estado vacío */
+        .empty-state { display: none; padding: 40px; background-color: #f9fafb; border-radius: 12px; color: #6b7280; margin-top: 20px; }
+
+        /* Estilos responsivos con mejoras */
+        @media (max-width: 768px) {
+            body { padding: 10px; }
+            .container { padding: 20px; }
+            h1 { font-size: 1.8rem; }
+            h2 { font-size: 1.5rem; }
+            .entry-form { grid-template-columns: 1fr 1fr; }
+            table, thead, tbody, th, td, tr { display: block; }
+            thead tr { position: absolute; top: -9999px; left: -9999px; }
+            tr { border: 1px solid #e5e7eb; margin-bottom: 10px; border-radius: 8px; }
+            td { border: none; position: relative; padding: 12px; padding-left: 45%; text-align: right; border-bottom: 1px solid #f3f4f6; }
+            td:last-child { border-bottom: none; }
+            td:before { position: absolute; left: 12px; width: 40%; white-space: nowrap; text-align: left; font-weight: 600; color: #2563eb; }
+            td:nth-of-type(1):before { content: "Fecha y Hora:"; }
+            td:nth-of-type(2):before { content: "Máxima:"; }
+            td:nth-of-type(3):before { content: "Mínima:"; }
+            td:nth-of-type(4):before { content: "Pulso:"; }
+            td:nth-of-type(5):before { content: "Acción:"; }
+            .delete-btn { transform: scale(0.9); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Registro de Presión Arterial</h1>
+        
+        <h2>Añadir Nuevo Registro</h2>
+        <form id="entryForm" class="entry-form">
+            <div class="form-group">
+                <label for="systolic">Máxima (Sistólica)</label>
+                <input type="number" id="systolic" required min="50" max="300">
+            </div>
+            <div class="form-group">
+                <label for="diastolic">Mínima (Diastólica)</label>
+                <input type="number" id="diastolic" required min="30" max="200">
+            </div>
+            <div class="form-group">
+                <label for="pulse">Pulso</label>
+                <input type="number" id="pulse" required min="30" max="250">
+            </div>
+            <div class="form-group">
+                <label for="date">Fecha</label>
+                <input type="date" id="date" required>
+            </div>
+            <div class="form-group">
+                <label for="time">Hora</label>
+                <input type="time" id="time" required>
+            </div>
+            <button type="submit" class="form-button">Guardar Registro</button>
+        </form>
+
+        <h2>Historial de Registros</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Fecha y Hora</th>
+                    <th>Máxima</th>
+                    <th>Mínima</th>
+                    <th>Pulso</th>
+                    <th>Acción</th>
+                </tr>
+            </thead>
+            <tbody id="dataTableBody">
+                <!-- Los datos se cargarán con JavaScript -->
+            </tbody>
+        </table>
+        <div id="emptyState" class="empty-state">
+            <p>No hay registros todavía. ¡Añade tu primera medición para empezar!</p>
+        </div>
+
+        <div class="chart-container" style="position: relative; height:400px; width:100%; margin-top: 40px;">
+            <canvas id="pressurePulseChart"></canvas>
+        </div>
+
+        <div class="legend">
+            <!-- La leyenda se generará con JavaScript -->
+        </div>
+
+    </div>
+
+    <script>
+        // --- CONFIGURACIÓN Y CONSTANTES ---
+        const PRESSURE_CATEGORIES = {
+            CRISIS: { name: 'Crisis Hipertensiva', color: '#dc2626' }, // Rojo oscuro
+            ALTA_2: { name: 'Hipertensión (Etapa 2)', color: '#ef4444' }, // Rojo
+            ALTA_1: { name: 'Hipertensión (Etapa 1)', color: '#f97316' }, // Naranja
+            ELEVADA: { name: 'Elevada', color: '#facc15' }, // Amarillo
+            NORMAL: { name: 'Normal', color: '#22c55e' }, // Verde
+            BAJA: { name: 'Hipotensión', color: '#3b82f6' }, // Azul
+        };
+
+        let pressurePulseChart;
+
+        // --- GESTIÓN DE DATOS (con localStorage) ---
+        const dataManager = {
+            loadData: () => {
+                const data = localStorage.getItem('bloodPressureData');
+                // Si no hay datos, usa los datos de ejemplo iniciales
+                const initialData = [
+                    { timestamp: 1717516800000, systolic: 151, diastolic: 101, pulse: 90 },
+                    { timestamp: 1717536000000, systolic: 154, diastolic: 104, pulse: 70 },
+                    { timestamp: 1717601400000, systolic: 137, diastolic: 91, pulse: 73 },
+                    { timestamp: 1717628400000, systolic: 139, diastolic: 88, pulse: 75 },
+                    { timestamp: 1717673100000, systolic: 121, diastolic: 79, pulse: 60 },
+                ];
+                return data ? JSON.parse(data) : initialData;
+            },
+            saveData: (data) => {
+                const sortedData = data.sort((a, b) => a.timestamp - b.timestamp);
+                localStorage.setItem('bloodPressureData', JSON.stringify(sortedData));
+            },
+            addEntry: (entry) => {
+                const data = dataManager.loadData();
+                data.push(entry);
+                dataManager.saveData(data);
+            },
+            deleteEntry: (timestamp) => {
+                let data = dataManager.loadData();
+                data = data.filter(entry => entry.timestamp !== timestamp);
+                dataManager.saveData(data);
+            }
+        };
+
+        // --- UTILIDADES ---
+        const utils = {
+            getPressureCategory: (systolic, diastolic) => {
+                if (systolic > 180 || diastolic > 120) return PRESSURE_CATEGORIES.CRISIS;
+                if (systolic >= 140 || diastolic >= 90) return PRESSURE_CATEGORIES.ALTA_2;
+                if (systolic >= 130 || diastolic >= 80) return PRESSURE_CATEGORIES.ALTA_1;
+                if (systolic >= 120) return PRESSURE_CATEGORIES.ELEVADA;
+                if (systolic < 90 || diastolic < 60) return PRESSURE_CATEGORIES.BAJA;
+                return PRESSURE_CATEGORIES.NORMAL;
+            },
+            formatDate: (timestamp) => {
+                const date = new Date(timestamp);
+                const options = { weekday: 'short', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false };
+                return new Intl.DateTimeFormat('es-AR', options).format(date).replace(/,/g, '');
+            },
+            setInitialFormDateTime: () => {
+                const now = new Date();
+                const dateInput = document.getElementById('date');
+                const timeInput = document.getElementById('time');
+                
+                // Formato YYYY-MM-DD para el input date
+                const year = now.getFullYear();
+                const month = (now.getMonth() + 1).toString().padStart(2, '0');
+                const day = now.getDate().toString().padStart(2, '0');
+                dateInput.value = `${year}-${month}-${day}`;
+
+                // Formato HH:MM para el input time
+                const hours = now.getHours().toString().padStart(2, '0');
+                const minutes = now.getMinutes().toString().padStart(2, '0');
+                timeInput.value = `${hours}:${minutes}`;
+            }
+        };
+
+        // --- RENDERIZADO DE LA INTERFAZ ---
+        function renderUI() {
+            const data = dataManager.loadData();
+            const tableBody = document.getElementById('dataTableBody');
+            const emptyState = document.getElementById('emptyState');
+            const table = tableBody.parentElement;
+
+            tableBody.innerHTML = '';
+
+            if (data.length === 0) {
+                emptyState.style.display = 'block';
+                table.style.display = 'none';
+                if(pressurePulseChart) pressurePulseChart.destroy();
+                return;
+            }
+            
+            emptyState.style.display = 'none';
+            table.style.display = '';
+
+            data.forEach(entry => {
+                const category = utils.getPressureCategory(entry.systolic, entry.diastolic);
+                const row = document.createElement('tr');
+                row.style.borderLeftColor = category.color;
+
+                row.innerHTML = `
+                    <td>${utils.formatDate(entry.timestamp)}</td>
+                    <td class="value-cell">${entry.systolic}</td>
+                    <td class="value-cell">${entry.diastolic}</td>
+                    <td class="value-cell">${entry.pulse}</td>
+                    <td>
+                        <button class="delete-btn" data-timestamp="${entry.timestamp}" title="Eliminar registro">X</button>
+                    </td>
+                `;
+                tableBody.appendChild(row);
+            });
+
+            renderChart(data);
+            renderLegend();
+        }
+
+        function renderChart(data) {
+            const ctx = document.getElementById('pressurePulseChart').getContext('2d');
+            if (pressurePulseChart) {
+                pressurePulseChart.destroy();
+            }
+            
+            pressurePulseChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    datasets: [
+                        {
+                            label: 'Sistólica',
+                            data: data.map(d => ({ x: d.timestamp, y: d.systolic })),
+                            borderColor: '#ef4444',
+                            tension: 0.3,
+                            pointRadius: 5,
+                            pointBackgroundColor: data.map(d => utils.getPressureCategory(d.systolic, d.diastolic).color),
+                        },
+                        {
+                            label: 'Diastólica',
+                            data: data.map(d => ({ x: d.timestamp, y: d.diastolic })),
+                            borderColor: '#3b82f6',
+                            tension: 0.3,
+                            pointRadius: 5,
+                             pointBackgroundColor: data.map(d => utils.getPressureCategory(d.systolic, d.diastolic).color),
+                        },
+                        {
+                            label: 'Pulso',
+                            data: data.map(d => ({ x: d.timestamp, y: d.pulse })),
+                            borderColor: '#6b7280',
+                            borderDash: [5, 5],
+                            tension: 0.3,
+                            pointRadius: 4,
+                            pointBackgroundColor: '#6b7280',
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            type: 'time',
+                            time: {
+                                unit: 'day',
+                                tooltipFormat: 'dd MMM yyyy, HH:mm',
+                                displayFormats: {
+                                    day: 'dd MMM'
+                                }
+                            },
+                            title: { display: true, text: 'Fecha' }
+                        },
+                        y: {
+                            beginAtZero: false,
+                            min: 40,
+                            title: { display: true, text: 'Valores' }
+                        }
+                    },
+                    plugins: {
+                        tooltip: {
+                            callbacks: {
+                                title: (context) => utils.formatDate(context[0].parsed.x)
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        function renderLegend() {
+            const legendContainer = document.querySelector('.legend');
+            legendContainer.innerHTML = '';
+            Object.values(PRESSURE_CATEGORIES).forEach(cat => {
+                const item = document.createElement('div');
+                item.className = 'legend-item';
+                item.innerHTML = `
+                    <div class="legend-color" style="background-color: ${cat.color};"></div>
+                    <span>${cat.name}</span>
+                `;
+                legendContainer.appendChild(item);
+            });
+        }
+
+
+        // --- MANEJADORES DE EVENTOS ---
+        document.getElementById('entryForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            
+            const systolic = parseInt(document.getElementById('systolic').value);
+            const diastolic = parseInt(document.getElementById('diastolic').value);
+            const pulse = parseInt(document.getElementById('pulse').value);
+            const date = document.getElementById('date').value;
+            const time = document.getElementById('time').value;
+
+            if (diastolic >= systolic) {
+                alert('La presión mínima (diastólica) no puede ser mayor o igual que la máxima (sistólica).');
+                return;
+            }
+
+            const timestamp = new Date(`${date}T${time}`).getTime();
+            
+            const newEntry = { timestamp, systolic, diastolic, pulse };
+            dataManager.addEntry(newEntry);
+            
+            renderUI();
+            e.target.reset(); // Limpia el formulario
+            utils.setInitialFormDateTime(); // Resetea la fecha y hora a la actual
+        });
+
+        document.getElementById('dataTableBody').addEventListener('click', (e) => {
+            if (e.target && e.target.classList.contains('delete-btn')) {
+                const timestamp = parseInt(e.target.dataset.timestamp);
+                if (confirm('¿Estás seguro de que quieres eliminar este registro?')) {
+                    dataManager.deleteEntry(timestamp);
+                    renderUI();
+                }
+            }
+        });
+        
+        window.addEventListener('resize', () => {
+             const data = dataManager.loadData();
+             if (data.length > 0) renderChart(data);
+        });
+
+        // --- INICIALIZACIÓN ---
+        document.addEventListener('DOMContentLoaded', () => {
+            utils.setInitialFormDateTime();
+            renderUI();
+        });
+    </script>
+</body>
+</html>
